@@ -1,0 +1,160 @@
+---
+- name: Install git if not exists
+  apt:
+    name: git
+    state: present
+- name: Git clone repository for {{ HOST_NAME }}
+  ansible.builtin.git:
+    repo: "{{ GATSBY_PROJECT_REPOSITIRY }}"
+    dest: "{{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}/gatsby_cms"
+    single_branch: yes
+    version: master
+    force: yes
+    clone: yes
+    update: yes
+  register: netlify_git
+  tags: netlify_git
+
+- block: ################netlify_file################
+  - name: Create a directory if it does not exist
+    ansible.builtin.file:
+      path: "{{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}/{{ item }}"
+      state: directory
+    with_items: [ 'nginx', 'gatsby_cms/static/admin', 'traefik' ]
+
+  - name: Copy Netlify CMS conf
+    template: src={{ item.src }} dest={{ item.dest }}
+    with_items:
+      - { src: 'templates/gatsby/gatsby-config.js', dest: '{{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}/gatsby_cms/static/gatsby-config.js' }
+      - { src: 'templates/gatsby/static/admin/admin_index.html', dest: '{{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}/gatsby_cms/static/admin/index.html' }
+    register: cms_file
+  # - name: Copy Netlify config
+  #   copy: src=templates/gatsby/static/admin/config.yml dest={{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}/gatsby_cms/static/admin/config.yml
+  #   register: cms_conf
+  - name: Copy docker-compose file
+    template: src=templates/docker-compose.yml.j2 dest={{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}/docker-compose.yml mode="700"
+    register: docker_compose
+    notify: Restart docker-compose
+  - name: Copy traefik file
+    template: src=templates/traefik_tls.yml dest={{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}/traefik/traefik_tls.yml
+  - name: Copy docker file
+    template: src={{ item.src }} dest={{ item.dest }}
+    with_items:
+      - { src: 'templates/gatsby.Dockerfile', dest: '{{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}/gatsby.Dockerfile' }
+    register: dockerfile
+  - name: copy nginx file
+    template: src={{ item.src }} dest={{ item.dest }}
+    with_items:
+      - { src: 'templates/nginx/custom_nginx.conf', dest: '{{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}/nginx/custom_nginx.conf' }
+  tags: netlify_file
+
+
+- block: ################build gatsby################
+  - name: Remove unused images
+    docker_prune:
+      timeout: "240"
+      images: yes
+      images_filters:
+        dangling: false
+  - name: Stop gatsby if config change
+    docker_compose:
+      project_src: "{{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}"
+      services: gatsby
+      state: absent
+    tags: gatsbycms_stop
+  - name: delete old image {{ HOST_NAME }}_gatsby
+    docker_image:
+      name: "{{ HOST_NAME }}_gatsby"
+      timeout: "360"
+      force_absent: yes
+      state: absent
+  when: dockerfile.changed or cms_file.changed or netlify_git.changed
+
+# - name: Restart container netlifycms in change docker-compose
+#   docker_compose:
+#     project_src: "{{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}"
+#     restarted: yes
+#   when: docker_compose.changed
+
+- name: Start container netlifycms in docker-compose
+  docker_compose:
+    project_src: "{{ DIR_CONFIG_FILE }}/{{ HOST_NAME }}"
+
+- block: ################mysql################
+  - name: Install MySQL-python if not exists
+    apt:
+      name: python3-pymysql
+      state: present
+  - name: wait for port 3306
+    wait_for:
+      port: 3306
+      delay: 10
+  - name: Check status gotrue
+    docker_container_info:
+      name: netlify_gotrue
+    register: gotrue_check
+
+  - name: Check exists table users
+    community.mysql.mysql_query:
+      login_host: "localhost"
+      login_db: "gotrue"
+      login_user: "{{ MYSQL_USER }}"
+      login_password: "{{ MYSQL_PASSWORD }}"
+      login_port: "3306"
+      query:
+      - SELECT email FROM gotrue.users LIMIT 1;
+    register: gotrue_exists_users
+    ignore_errors: true
+
+  - name: Run gotrue migrate if schema is not initialized
+    community.docker.docker_container_exec:
+      container: netlify_gotrue
+      command: /bin/sh -c "gotrue migrate"
+    when: gotrue_exists_users is failed and gotrue_check.exists
+
+  - name: Get users in db
+    community.mysql.mysql_query:
+      login_host: "localhost"
+      login_db: "gotrue"
+      login_user: "{{ MYSQL_USER }}"
+      login_password: "{{ MYSQL_PASSWORD }}"
+      login_port: "3306"
+      query:
+      - SELECT email,aud,role,is_super_admin FROM gotrue.users;
+    register: gotrue_db_users
+
+  - name: set unnecessary email users
+    set_fact: unnecessary_users="{{ gotrue_db_users.query_result|json_query('[].email') | difference(ACCEESS_ADMIN_USER|json_query('[].email')) }}"
+
+  - name: set added email users
+    set_fact: added_users="{{ ACCEESS_ADMIN_USER | selectattr('email', 'match', '^' + (ACCEESS_ADMIN_USER|map(attribute='email'))|difference(gotrue_db_users.query_result|json_query('[].email'))|join('|') + '$') | list }}"
+
+  - name: delete all users
+    community.mysql.mysql_query:
+      login_host: "localhost"
+      login_db: "gotrue"
+      login_user: "{{ MYSQL_USER }}"
+      login_password: "{{ MYSQL_PASSWORD }}"
+      login_port: "3306"
+      query:
+      - LOCK TABLES `users` WRITE;
+      - DELETE FROM users WHERE email='{{ item }}';
+      - UNLOCK TABLES;
+    with_items:
+      - "{{ unnecessary_users }}"
+    when: unnecessary_users is defined
+  - name: add user
+    community.mysql.mysql_query:
+      login_host: "localhost"
+      login_db: "gotrue"
+      login_user: "{{ MYSQL_USER }}"
+      login_password: "{{ MYSQL_PASSWORD }}"
+      login_port: "3306"
+      query:
+      - LOCK TABLES `users` WRITE;
+      - INSERT INTO gotrue.users (instance_id,id,aud,role,email,encrypted_password,confirmed_at,invited_at,confirmation_token,confirmation_sent_at,recovery_token,recovery_sent_at,email_change_token,email_change,email_change_sent_at,last_sign_in_at,raw_app_meta_data,raw_user_meta_data,is_super_admin,created_at,updated_at) values ('00000000-0000-0000-0000-000000000000',UUID(),'{{ item.aud }}','{{ item.role}}','{{ item.email }}','',now(),NULL,'',NULL,'',NULL,'','',NULL,NULL,'{\"provider\":\"google\"}','null',{{ item.is_super_admin }},now(),now());
+      - UNLOCK TABLES;
+    with_items:
+      - "{{ added_users }}"
+    when: added_users is defined
+  tags: netlify_sql

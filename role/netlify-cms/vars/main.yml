@@ -1,0 +1,43 @@
+---
+# ansible_ssh_private_key_file: ~/.ssh/id_rsa
+ansible_python_interpreter: /usr/bin/python3
+acme_challenge: dns_cloudflare  #http or dns_cloudflare
+# API_TOKEN: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=vault/data/cloudflare:API_TOKEN') }}"
+API_TOKEN: "API_TOKEN"
+JWT_SECRET: "JWT_SECRET"
+GITGATEWAY_GITHUB_ACCESS_TOKEN: "GITHUB_ACCESS_TOKEN"
+MYSQL_ROOT_PASSWORD: "MYSQL_ROOT_PASSWORD"
+MYSQL_PASSWORD: "MYSQL_PASSWORD"
+GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: "GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID"
+GOTRUE_EXTERNAL_GOOGLE_SECRET: "GOTRUE_EXTERNAL_GOOGLE_SECRET"
+GOTRUE_OPERATOR_TOKEN: "GOTRUE_OPERATOR_TOKEN"
+
+DOCKER_MTU: 1454
+DIR_CONFIG_FILE: /opt/netlifycms
+
+GATSBY_PROJECT_REPOSITIRY: "https://netlify-cms:{{ GITGATEWAY_GITHUB_ACCESS_TOKEN }}@github.com/{{ GITGATEWAY_GITHUB_REPO }}.git"
+TIMEZONE: Europe/Samara
+MYSQL_DATABASE: gotrue
+MYSQL_USER: gotrue
+GITGATEWAY_GITHUB_REPO: GITHUB_REPO
+GITGATEWAY_ROLES: "admin,edit"
+
+GOTRUE_LOG_LEVEL: INFO
+
+HOST_NAME: example.ru
+DOMAIN_NAME: example.ru
+
+ACCEESS_ADMIN_USER: 
+  - { email: "test@example.ru", aud: "{{ HOST_NAME }}", role: "admin", is_super_admin: "1" }
+  - { email: "test2@example.ru", aud: "{{ HOST_NAME }}", role: "admin", is_super_admin: "0" }
+
+###Для загрузки закрытого репозитория
+# vars_prompt:
+#   - name: "githubuser"
+#     prompt: "**********Enter your github username********** \n"
+#     default: '{{ lookup("env", "GITHUBUSER") }}'
+#     private: no
+#   - name: "githubaccesstoken"
+#     prompt: "**********Enter your github Personal access tokens********** \n https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token \n"
+#     default: '{{ lookup("env", "GITHUBACCESSTOKEN") }}'
+#     private: yes

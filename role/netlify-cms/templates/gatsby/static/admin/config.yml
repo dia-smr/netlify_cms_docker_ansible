@@ -1,0 +1,61 @@
+backend:
+  name: git-gateway
+  repo: "{{ GITGATEWAY_GITHUB_REPO }}"
+  branch: master
+  identity_url: "https://test.example.ru/.netlify/identity"
+  gateway_url:  "https://test.example.ru/.netlify/git"
+  site_domain:  "https://test.example.ru"
+
+  commit_messages:
+    create: 'Create {{collection}} “{{slug}}”'
+    update: 'Update {{collection}} “{{slug}}”'
+    delete: 'Delete {{collection}} “{{slug}}”'
+    uploadMedia: '[skip ci] Upload “{{path}}”'
+    deleteMedia: '[skip ci] Delete “{{path}}”'
+
+media_folder: static/img
+public_folder: /img
+
+collections:
+  - name: "blog"
+    label: "News"
+    folder: "src/pages/blog"
+    create: true
+    slug: "{{year}}-{{month}}-{{day}}-{{slug}}"
+    fields:
+      - {label: "Template Key", name: "templateKey", widget: "hidden", default: "blog-post"}
+      - {label: "Title", name: "title", widget: "string"}
+      - {label: "Publish Date", name: "date", widget: "datetime"}
+      - {label: "News Greek", name: "newsEl", widget: object, fields: [{label: "Title", name: "title", widget: string}, {label: "Description", name: "description", widget: "markdown"}]}
+      - {label: News English, name: newsEn, widget: object, fields: [{label: Title, name: title, widget: string}, {label: Description, name: description, widget: "markdown"}]}
+      - {label: "Tags", name: "tags", widget: "list"}
+
+  - name: "pages"
+    label: "Pages"
+    files:
+      - file: "src/pages/index.md"
+        label: "Landing Page Greek"
+        name: "index"
+        fields:
+          - {label: "Template Key", name: "templateKey", widget: "hidden", default: "index-page"}
+          - {label: Title, name: title, widget: string}
+          - {label: Image, name: image, widget: image}
+          - {label: About, name: about, widget: object, fields: [{label: Title, name: title, widget: string}, {label: IntroText, name: introText, widget: text}, {label: Description, name: description, widget: "markdown"}]}
+          - {label: Platform, name: platform, widget: object, fields: [{label: Title, name: title, widget: string}, {label: IntroText, name: introText, widget: text}, {label: Description, name: description, widget: "markdown"}]}
+          - {label: Partners, name: partners, widget: object, fields: [{label: Title, name: title, widget: string}, {label: Image, name: image, widget: image}, {label: Description, name: description, widget: "markdown"}]}
+          - {label: Intro, name: intro, widget: object, fields: [{label: Heading, name: heading, widget: string}, {label: Blurbs, name: blurbs, widget: list, fields: [{label: Image, name: image, widget: image}, {label: Title, name: title, widget: text}, {label: Text, name: text, widget: text}]}]}
+          - {label: Responsibility, name: responsibility, widget: object, fields: [{label: Title, name: title, widget: string}, {label: IntroText, name: introText, widget: text}, {label: Description, name: description, widget: "markdown"}]}
+          # - {label: Sponsors, name: sponsors, widget: object, fields: [{label: Title, name: title, widget: text}, {label: Title1, name: title1, widget: text}, {label: Column1, name: column1, widget: "markdown"}, {label: Title2, name: title2, widget: text}, {label: Column2, name: column2, widget: "markdown"}, {label: Title3, name: title3, widget: text}, {label: Column3, name: column3, widget: "markdown"}]}
+      - file: "src/pages/en/index.md"
+        label: "Landing Page English"
+        name: "en"
+        fields:
+          - {label: "Template Key", name: "templateKey", widget: "hidden", default: "en"}
+          - {label: Title, name: title, widget: string}
+          - {label: Image, name: image, widget: image}
+          - {label: About, name: about, widget: object, fields: [{label: Title, name: title, widget: string}, {label: IntroText, name: introText, widget: text}, {label: Description, name: description, widget: "markdown"}]}
+          - {label: Platform, name: platform, widget: object, fields: [{label: Title, name: title, widget: string}, {label: IntroText, name: introText, widget: text}, {label: Description, name: description, widget: "markdown"}]}
+          - {label: Partners, name: partners, widget: object, fields: [{label: Title, name: title, widget: string}, {label: Image, name: image, widget: image}, {label: Description, name: description, widget: "markdown"}]}
+          - {label: Intro, name: intro, widget: object, fields: [{label: Heading, name: heading, widget: string}, {label: Blurbs, name: blurbs, widget: list, fields: [{label: Image, name: image, widget: image}, {label: Title, name: title, widget: text}, {label: Text, name: text, widget: text}]}]}
+          - {label: Responsibility, name: responsibility, widget: object, fields: [{label: Title, name: title, widget: string}, {label: IntroText, name: introText, widget: text}, {label: Description, name: description, widget: "markdown"}]}
+          # - {label: Sponsors, name: sponsors, widget: object, fields: [{label: Title, name: title, widget: text}, {label: Column, name: column, widget: "markdown"}]}
